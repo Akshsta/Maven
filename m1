@@ -1,0 +1,64 @@
+name: Java CI/CD on EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ec2-user
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+
+    - name: Cache Maven dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-maven
+
+    - name: Build with Maven
+      run: mvn clean package
+
+    - name: Upload WAR file
+      uses: actions/upload-artifact@v3
+      with:
+        name: java-artifact
+        path: target/*.war
+
+  deploy:
+    runs-on: ec2-user
+    needs: build
+
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: java-artifact
+
+    - name: Copy WAR to EC2
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ec2-3.84.220.25.compute-1.amazonaws.com
+        username: ec2-user
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "*.war"
+        target: "/home/ec2-user/deployments"
+
+    - name: SSH to EC2 and restart Tomcat
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ec2-3.84.220.25.compute-1.amazonaws.com
+        username: ec2-user
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          sudo systemctl stop tomcat
+          sudo cp /home/ec2-user/deployments/*.war /opt/tomcat/webapps/
+          sudo systemctl start tomcat
