@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Clone the Code') {
             steps {
-                git 'https://github.com/KastroVKiran/Netflix-Pipeline-Project.git'
+                git 'https://github.com/Akshsta/cicdakshat.git''
             }
         }
         stage('Maven Build') {
